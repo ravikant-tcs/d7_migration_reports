@@ -1,0 +1,127 @@
+<?php
+
+/**
+ * @file
+ * Core functionality for Genotropin Users Handling.
+ */
+define('REPORT_ENTITIES', [
+  'export_all' => '-- Export All Entities --',
+  'node' => 'Contents',
+  'field' => 'Fields',
+  'blocks' => 'Blocks',
+  'menus' => 'Menus',
+  'taxonomy' => 'Taxonomy',
+  'views' => 'Views',
+  'users_roles' => 'User Roles',
+  'users' => 'Users',
+  'permissions' => 'Permissions Matrix',
+  'languages' => 'Languages',
+  'modules' => 'Custom Modules',
+  'file_data' => 'Files / Media',
+]);
+
+function migration_audit_report_menu() {
+  $items['admin/config/migration-report'] = array(
+    'title' => 'Migration Audit Report',
+    'description' => 'Download report for various entities of D7.',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  );
+
+  $items['admin/config/migration-report/report-form'] = array(
+    'title' => 'Get Report',
+    'description' => 'Migration Audit Report',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('migration_audit_report_form'),
+    'access arguments' => array('access administration pages'),
+  );
+
+  return $items;
+}
+
+function migration_audit_report_form() {
+  $form['report_name'] = [
+    '#type' => 'select',
+    '#title' => 'Select Entities',
+    '#options' => REPORT_ENTITIES
+  ];
+
+  $form['submit'] = [
+    '#type' => 'submit',
+    '#value' => 'Download Report',
+  ];
+
+  return $form;
+}
+
+function migration_audit_report_form_submit($form, &$form_state) {
+
+  module_load_include('inc', 'migration_audit_report', 'includes/export_data');
+
+  switch ($form_state['values']['report_name']) {
+    case 'node':
+      module_load_include('inc', 'migration_audit_report', 'includes/node_data');
+      migration_audit_node_report_data();
+      break;
+
+    case 'field':
+      module_load_include('inc', 'migration_audit_report', 'includes/field_data');
+      migration_audit_field_report_data();
+      break;
+
+    case 'blocks':
+      module_load_include('inc', 'migration_audit_report', 'includes/blocks_data');
+      migration_audit_block_report_data();
+      break;
+
+    case 'menus':
+      module_load_include('inc', 'migration_audit_report', 'includes/menus_data');
+      migration_audit_menus_report_data();
+      break;
+
+    case 'taxonomy':
+      module_load_include('inc', 'migration_audit_report', 'includes/taxonomy_data');
+      migration_audit_taxonomy_data();
+      break;
+
+    case 'views':
+      module_load_include('inc', 'migration_audit_report', 'includes/views_data');
+      migration_audit_views_data();
+      break;
+
+    case 'users_roles':
+      module_load_include('inc', 'migration_audit_report', 'includes/users_roles_data');
+      migration_audit_users_roles_data();
+      break;
+
+    case 'users':
+      module_load_include('inc', 'migration_audit_report', 'includes/users_data');
+      migration_audit_users_data();
+      break;
+
+    case 'permissions':
+      module_load_include('inc', 'migration_audit_report', 'includes/permissions_data');
+      migration_audit_permissions_data();
+      break;
+
+    case 'languages':
+      module_load_include('inc', 'migration_audit_report', 'includes/languages_data');
+      migration_audit_languages_data();
+
+    case 'modules':
+      module_load_include('inc', 'migration_audit_report', 'includes/modules_data');
+      migration_audit_modules_data();
+
+    case 'file_data':
+      module_load_include('inc', 'migration_audit_report', 'includes/file_media_data');
+      migration_audit_file_media_data();
+
+    default:
+      module_load_include('inc', 'migration_audit_report', 'includes/export_all_data');
+      migration_audit_report_export_all_data();
+      break;
+  }
+
+}

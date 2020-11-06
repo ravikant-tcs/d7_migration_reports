@@ -1,0 +1,620 @@
+<?php
+
+/**
+ * @file
+ * Content score.
+ */
+
+define('CONTENT_SCORE_IMAGE_TAG_TYPE', 1);
+define('CONTENT_SCORE_SCRIPT_TAG_TYPE', 2);
+define('CONTENT_SCORE_STYLE_TAG_TYPE', 3);
+define('CONTENT_SCORE_LINK_TAG_TYPE', 4);
+
+define('CONTENT_SCORE_IMAGE_RESULT', 4);
+define('CONTENT_SCORE_JS_RESULT', 5);
+define('CONTENT_SCORE_CSS_RESULT', 6);
+
+/**
+ * Implements hook_menu().
+ */
+function content_score_menu() {
+
+  $items['node/%node/content-score'] = array(
+    'title' => 'Content Score',
+    'page callback' => 'content_score_node_display',
+    'page arguments' => array(1),
+    'access arguments' => array('administer content score'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['admin/config/migration-report/content-score/refresh'] = array(
+    'title' => 'Score Refresh',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('content_score_reports_refresh_form'),
+    'access arguments' => array('administer content score'),
+    'file' => 'includes/content_score.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 2,
+  );
+
+  $items['admin/config/migration-report/content-score/export'] = array(
+    'title' => 'Score Export',
+    'page callback' => 'content_score_reports_export',
+    'access arguments' => array('administer content score'),
+    'file' => 'includes/content_score.admin.inc',
+    'type' => MENU_LOCAL_ACTION,
+    'weight' => 2,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permissions().
+ */
+function content_score_permission() {
+  $perms = array(
+    'administer content score' => array(
+      'title' => t('Administer content score'),
+      'description' => t('Administer content score report & refresh.'),
+    ),
+  );
+  return $perms;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function content_score_theme($existing, $type, $theme, $path) {
+  return array(
+    'content_score' => array(
+      'template' => 'templates/content-score',
+      'variables' => array('search_text' => NULL),
+    ),
+  );
+}
+
+/**
+ * Displays score of the node content.
+ */
+function content_score_node_display($node) {
+  return content_score_display('node', $node);
+}
+
+/**
+ * Helper function to display score of the content.
+ */
+function content_score_display($entity_type, $entity) {
+
+  $module_path = drupal_get_path('module', 'content_score');
+  drupal_add_css($module_path . '/css/easy-responsive-tabs.css', 'file');
+  drupal_add_css($module_path . '/css/content_score.css', 'file');
+  drupal_add_js($module_path . '/js/easyResponsiveTabs.js', 'file');
+  drupal_add_js($module_path . '/js/content_score.js', 'file');
+
+  $entity_wrapper = entity_metadata_wrapper($entity_type, $entity);
+  $search_text = content_score_get_score_by_entity($entity_type, $entity_wrapper);
+
+  return theme('content_score', array('search_text' => $search_text));
+}
+
+/**
+ * Get score by entity.
+ */
+function content_score_get_score_by_entity($entity_type, $entity_wrapper) {
+  $bundle = $entity_wrapper->getBundle();
+  $allowed_types = array(
+    'text_textarea', 'text_textarea_with_summary', 'field_jquery_tabs_widget',
+  );
+  $fields = field_info_instances($entity_type, $bundle);
+  $entity_data = array();
+  foreach ($fields as $field_name => $field_value) {
+    if (in_array($field_value['widget']['type'], $allowed_types)) {
+      if ($field_value["widget"]["type"] == 'field_jquery_tabs_widget') {
+        // Add support for tabbed article.
+        if ($entity_type == 'node') {
+          $node = node_load($entity_wrapper->getIdentifier());
+          // Even in multi lang site value stored under LANGUAGE_NONE.
+          if ($node->{$field_name} && $node->{$field_name}[LANGUAGE_NONE][0]) {
+            $tabs_field = $node->{$field_name}[LANGUAGE_NONE][0];
+            for ($i = 1; $i <= 7; $i++) {
+              if (!empty($tabs_field['tab_body_' . $i])) {
+                $result = content_score_get_score($tabs_field['tab_body_' . $i]);
+                if ($result) {
+                  $label = 'Tab ' . $i . ' Body';
+                  $entity_data['tab_body_' . $i]['data'] = $result;
+                  $entity_data['tab_body_' . $i]['label'] = t('@label', array('@label' => $label));
+                }
+              }
+            }
+          }
+        }
+      }
+      else {
+        $field = $entity_wrapper->$field_name->value();
+        if ($field && !empty($field['value'])) {
+          $result = content_score_get_score($field['value']);
+          if ($result) {
+            $entity_data[$field_name]['data'] = $result;
+            $entity_data[$field_name]['label'] = $field_value['label'];
+          }
+        }
+      }
+    }
+  }
+  return $entity_data;
+}
+
+/**
+ * Helper function to get score based on text.
+ */
+function content_score_get_score($text) {
+  $search_text = array();
+  if (!empty($text)) {
+    $text = htmlspecialchars_decode($text);
+    $tags = content_score_get_tags();
+    $search_str = array_keys($tags);
+    foreach ($search_str as $html_tag) {
+      content_score_get_result($text, $html_tag, $search_text);
+    }
+  }
+
+  $search_text = content_score_include_link_tag_into_style($search_text);
+  return $search_text;
+}
+
+/**
+ * Include <link> tag to <style> tag.
+ */
+function content_score_include_link_tag_into_style($search_text) {
+  if (!empty($search_text['link'])) {
+    $link_count = $search_text['link']['count'];
+    for ($i = 0; $i < $link_count; $i++) {
+      if (empty($search_text['style']['data'])) {
+        $search_text['style']['data'] = array();
+      }
+      array_push($search_text['style']['data'], $search_text['link']['data'][$i]);
+    }
+    $search_text['style']['score'] += $search_text['link']['score'];
+    $search_text['style']['count'] += $search_text['link']['count'];
+    unset($search_text['link']);
+  }
+
+  foreach ($search_text as $html_tag => $value) {
+    if ($value['score'] == 0) {
+      unset($search_text[$html_tag]);
+    }
+  }
+
+  return $search_text;
+}
+
+/**
+ * Finds content.
+ */
+function content_score_get_result($text, $html_tag, &$search_text) {
+  $total_score = 0;
+  $html_score = content_score_get_tags($html_tag);
+  if ($html_score['score']) {
+    $count = 0;
+    foreach (content_score_extract_tags($text, $html_tag) as $element) {
+      $search_text[$html_tag]['data'][] = htmlspecialchars($element['full_tag']);
+      $total_score = $total_score + $html_score['score'];
+      $count++;
+    }
+    $search_text[$html_tag]['html_tag'] = $html_tag;
+    $search_text[$html_tag]['score'] = $total_score;
+    $search_text[$html_tag]['message'] = $html_score['message'];
+    $search_text[$html_tag]['count'] = $count;
+  }
+}
+
+/**
+ * Get score and its message.
+ */
+function content_score_get_tags($html_tag = NULL) {
+  $tags = array(
+    'img' => array('score' => CONTENT_SCORE_IMAGE_RESULT, 'message' => 'Hardcoded Image path:'),
+    'script' => array('score' => CONTENT_SCORE_JS_RESULT, 'message' => 'Hardcoded Script tags:'),
+    'link' => array('score' => CONTENT_SCORE_CSS_RESULT, 'message' => 'Hardcoded Style tags:'),
+    'style' => array('score' => CONTENT_SCORE_CSS_RESULT, 'message' => 'Hardcoded Style tags:'),
+  );
+
+  return $html_tag ? $tags[$html_tag] : $tags;
+}
+
+/**
+ * Get score and its message.
+ */
+function content_score_allowed_entities() {
+  // To add new entity
+  // Update views edit handler
+  // Add menu callback.
+  $entities = array(
+    'node',
+  );
+  return $entities;
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function content_score_entity_update($entity, $type) {
+
+  if (in_array($type, content_score_allowed_entities())) {
+    $entity_wrapper = entity_metadata_wrapper($type, $entity);
+    content_score_entity_data_save_details($entity_wrapper, $type);
+  }
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function content_score_entity_insert($entity, $type) {
+  if (in_array($type, content_score_allowed_entities())) {
+    $entity_wrapper = entity_metadata_wrapper($type, $entity);
+    content_score_entity_data_save_details($entity_wrapper, $type);
+  }
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function content_score_entity_delete($entity, $type) {
+  if (in_array($type, content_score_allowed_entities())) {
+    $entity_wrapper = entity_metadata_wrapper($type, $entity);
+    content_score_delete_entity_details($entity_wrapper, $type);
+  }
+}
+
+/**
+ * Delete Content Score Details.
+ *
+ * @param mixed $entity_wrapper
+ *   $entity_wrapper Object.
+ * @param mixed $type
+ *   Type of an entity.
+ */
+function content_score_delete_entity_details($entity_wrapper, $type) {
+  db_delete('content_score')
+  // Check entity id.
+    ->condition('entity_id', $entity_wrapper->getIdentifier())
+    ->condition('entity_type', $type)
+    ->execute();
+}
+
+/**
+ * Save content score Details.
+ */
+function content_score_entity_data_save_details($entity_wrapper, $type) {
+  $score = content_score_get_score_by_entity($type, $entity_wrapper);
+
+  // Delete record from database if score is empty.
+  if (!$score) {
+    content_score_delete_entity_details($entity_wrapper, $type);
+  }
+  else {
+    $score_count = 0;
+    $new_score = array();
+
+    foreach ($score as $field_name => $field_data) {
+      foreach ($field_data['data'] as $tag_name => $tag_data) {
+        $score_count = $score_count + $tag_data['score'];
+        if (empty($new_score[$tag_name])) {
+          $new_score[$tag_name] = array(
+            'title' => $entity_wrapper->label(),
+            'entity_type' => $type,
+            'entity_id' => $entity_wrapper->getIdentifier(),
+            'error_type' => $tag_data['html_tag'],
+            'total_count' => $tag_data['count'],
+          );
+        }
+        else {
+          $new_score[$tag_name]['total_count'] = $new_score[$tag_name]['total_count'] + $tag_data['count'];
+        }
+      }
+    }
+    foreach ($new_score as $tag_name => $final_score) {
+      $final_score['score'] = $score_count;
+      content_score_save_details($final_score);
+    }
+  }
+}
+
+/**
+ * Helper function to save content score Details.
+ */
+function content_score_save_details($record) {
+  if ($record) {
+    if ($record['score']) {
+      $record['updated'] = time();
+      db_merge('content_score')
+        ->fields($record)
+        ->key(array(
+          'entity_id' => $record['entity_id'],
+          'entity_type' => $record['entity_type'],
+          'error_type' => $record['error_type'],
+        ))
+        ->execute();
+    }
+    else {
+      // Score 0 so delete entry from table.
+      db_delete('content_score')
+        ->condition('entity_id', $record['entity_id'])
+        ->condition('entity_type', $record['entity_type'])
+        ->condition('error_type', $record['error_type'])
+        ->execute();
+    }
+  }
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function content_score_views_api() {
+  return array(
+    'api' => '3.0',
+    'path' => drupal_get_path('module', 'content_score') . '/views',
+  );
+}
+
+/**
+ * Extract specific HTML tags and their attributes from a string.
+ *
+ * You can either specify one tag, an array of tag names, or a regular expres
+ * sion that matches the tag name(s).
+ * If multiple tags are specified you must also set the $selfclosing parameter
+ * and it must be the same for
+ * all specified tags (so you can't extract both normal and self-closing tags
+ * in one go).
+ *
+ * The function returns a numerically indexed array of extracted tags.
+ * Each entry is an associative array
+ * with these keys :
+ *  tag_name    - the name of the extracted tag, e.g. "a" or "img".
+ *  offset      - the numberic offset of the first character of the tag within
+ * the HTML source.
+ *  contents    - the inner HTML of the tag. This is always empty for
+ * self-closing tags.
+ *  attributes  - a name -> value array of the tag's attributes, or an empty
+ * array if the tag has none.
+ *  full_tag    - the entire matched tag, e.g.
+ * '<a href="http://example.com">example.com</a>'. This key will only be
+ * present if you set $return_the_entire_tag to true.
+ *
+ * @param string $html
+ *   The HTML code to search for tags.
+ * @param string|array $tag
+ *   The tag(s) to extract.
+ * @param bool $selfclosing
+ *   Whether the tag is self-closing or not. Setting it to null will force
+ *   the script to try and make an educated guess.
+ * @param bool $return_the_entire_tag
+ *   Return the entire matched tag in 'full_tag' key of the results array.
+ * @param string $charset
+ *   The character set of the HTML code. Defaults to ISO-8859-1.
+ *
+ * @return array
+ *   An array of extracted tags, or an empty array if no matching
+ *   tags were found.
+ */
+function content_score_extract_tags($html, $tag, $selfclosing = NULL, $return_the_entire_tag = TRUE, $charset = 'ISO-8859-1') {
+  if (is_array($tag)) {
+    $tag = implode('|', $tag);
+  }
+
+  // If the user didn't specify if $tag is a self-closing tag we try to
+  // auto-detect it by checking against a list of known self-closing tags.
+  $selfclosing_tags = array(
+    'area',
+    'base',
+    'basefont',
+    'br',
+    'hr',
+    'input',
+    'img',
+    'link',
+    'meta',
+    'col',
+    'param',
+  );
+  if (is_null($selfclosing)) {
+    $selfclosing = in_array($tag, $selfclosing_tags);
+  }
+
+  // The regexp is different for normal and self-closing tags because
+  // I can't figure out how to make a sufficiently robust unified one.
+  if ($selfclosing) {
+    $tag_pattern =
+    '@<(?P<tag>' . $tag . ')           # <tag
+    (?P<attributes>\s[^>]+)?       # attributes, if any
+    \s*/?>                   # /> or just >, being lenient here
+    @xsi';
+  }
+  else {
+    $tag_pattern =
+    '@<(?P<tag>' . $tag . ')           # <tag
+    (?P<attributes>\s[^>]+)?       # attributes, if any
+    \s*>                 # >
+    (?P<contents>.*?)         # tag contents
+    </(?P=tag)>               # the closing </tag>
+    @xsi';
+  }
+
+  $attribute_pattern =
+  '@
+  (?P<name>\w+)                         # attribute name
+  \s*=\s*
+  (
+  (?P<quote>[\"\'])(?P<value_quoted>.*?)(?P=quote)    # a quoted value
+  |                           # or
+  (?P<value_unquoted>[^\s"\']+?)(?:\s+|$)           # an unquoted value (terminated by whitespace or EOF)
+  )
+  @xsi';
+
+  // Find all tags.
+  if (!preg_match_all($tag_pattern, $html, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+    // Return an empty array if we didn't find anything.
+    return array();
+  }
+
+  $tags = array();
+  foreach ($matches as $match) {
+
+    // Parse tag attributes, if any.
+    $attributes = array();
+    if (!empty($match['attributes'][0])) {
+
+      if (preg_match_all($attribute_pattern, $match['attributes'][0], $attribute_data, PREG_SET_ORDER)) {
+        // Turn the attribute data into a name->value array.
+        foreach ($attribute_data as $attr) {
+          if (!empty($attr['value_quoted'])) {
+            $value = $attr['value_quoted'];
+          }
+          elseif (!empty($attr['value_unquoted'])) {
+            $value = $attr['value_unquoted'];
+          }
+          else {
+            $value = '';
+          }
+
+          // Passing the value through html_entity_decode is handy when you
+          // want to extract link URLs or something like that. You might want
+          // to remove or modify this call if it doesn't fit your situation.
+          $value = html_entity_decode($value, ENT_QUOTES, $charset);
+
+          $attributes[$attr['name']] = $value;
+        }
+      }
+
+    }
+
+    $tag = array(
+      'tag_name' => $match['tag'][0],
+      'offset' => $match[0][1],
+    // Empty for self-closing tags.
+      'contents' => !empty($match['contents']) ? $match['contents'][0] : '',
+      'attributes' => $attributes,
+    );
+    if ($return_the_entire_tag) {
+      $tag['full_tag'] = $match[0][0];
+    }
+
+    $tags[] = $tag;
+  }
+
+  return $tags;
+}
+
+/**
+ * Get Content Score Content.
+ */
+function content_score_contents() {
+  global $base_url;
+  $tags = content_score_get_tags();
+  $search_str = array_keys($tags);
+
+  $img_tag_cnt = 0;
+  $script_tag_cnt = 0;
+  $style_tag_cnt = 0;
+
+  foreach ($search_str as $html_tag) {
+    switch ($html_tag) {
+      case 'img':
+        $img_tag_cnt = content_score_get_total_tags_count($html_tag);
+        break;
+
+      case 'script':
+        $script_tag_cnt = content_score_get_total_tags_count($html_tag);
+        break;
+
+      case 'style':
+        $style_tag_cnt = content_score_get_total_tags_count($html_tag);
+        break;
+    }
+  }
+
+  $view_url = $base_url . '/admin/content-score/details';
+  $messages = content_score_get_header_message();
+
+  $block_str = array(
+    l(t('Image Hardcoded Tags (Count: @cnt)', array('@cnt' => $img_tag_cnt)), $view_url, array('query' => array('error_type' => CONTENT_SCORE_IMAGE_TAG_TYPE))),
+    l(t('Script Hardcoded Tags (Count: @cnt)', array('@cnt' => $script_tag_cnt)), $view_url, array('query' => array('error_type' => CONTENT_SCORE_SCRIPT_TAG_TYPE))),
+    l(t('Style Hardcoded Tags (Count: @cnt)', array('@cnt' => $style_tag_cnt)), $view_url, array('query' => array('error_type' => CONTENT_SCORE_STYLE_TAG_TYPE))),
+  );
+
+  $result = array(
+    '#markup' => implode('  ', $block_str) . $messages['#markup'],
+  );
+  return $result;
+}
+
+/**
+ * Helper function to get total tags count.
+ */
+function content_score_get_total_tags_count($tag_name = '') {
+  $query = db_select('content_score', 'ms')
+    ->fields('ms', array('total_count'));
+
+  $query->addExpression('SUM(total_count)', 'total_tags');
+  if (!empty($tag_name)) {
+    $query->condition('error_type', $tag_name, '=');
+  }
+
+  $result = $query->execute()->fetchAll();
+
+  if (!empty($result[0]->total_tags)) {
+    return $result[0]->total_tags;
+  }
+
+  return 0;
+}
+
+/**
+ * Helper function to get header message.
+ */
+function content_score_get_header_message() {
+  $get_total_distinct_records = db_select('content_score', 'cs')
+    ->fields('cs', array('entity_id'))
+    ->distinct()
+    ->countQuery()->execute()->fetchField();
+
+  $message = t('Total entities with hardcoded tags : @count', array('@count' => $get_total_distinct_records));
+
+  $result = array(
+    '#type' => 'markup',
+    '#markup' => '<div id="score_msg">' . $message . '</div>',
+  );
+
+  return $result;
+}
+
+/**
+ * Implements hook_views_pre_render().
+ */
+function content_score_views_pre_render(&$view) {
+  if ($view->name == 'content_score') {
+    $module_path = drupal_get_path('module', 'content_score');
+    drupal_add_css($module_path . '/css/content_score.css');
+    drupal_add_js($module_path . '/js/content_score.js');
+    $contents = content_score_contents();
+    $view->header['area']->options['content'] = $contents['#markup'];
+
+    $view->style_plugin->render_fields($view->result);
+    foreach ($view->style_plugin->rendered_fields as $index => &$rendered_result) {
+      $prefix_red = "<span class='bad-score-red'>";
+      $prefix_green = "<span class='score-green'>";
+      $prefix_yellow = "<span class='score-yellow'>";
+      $suffix = "</span>";
+      if ($rendered_result['score'] <= 100) {
+        $rendered_result['score'] = $prefix_green . $rendered_result['score'] . $suffix;
+      }
+      if ($rendered_result['score'] > 100 && $rendered_result['score'] <= 200) {
+        $rendered_result['score'] = $prefix_yellow . $rendered_result['score'] . $suffix;
+      }
+      if ($rendered_result['score'] > 200) {
+        $rendered_result['score'] = $prefix_red . $rendered_result['score'] . $suffix;
+      }
+    }
+  }
+}

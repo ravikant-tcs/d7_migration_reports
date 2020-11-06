@@ -1,0 +1,111 @@
+/**
+ * @file
+ * Content Score CSS File.
+ */
+
+.score-wrapper .codeblock {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.score-wrapper .score-content {
+  display: none;
+}
+
+.score-wrapper .score-title {
+  cursor: pointer;
+  text-decoration: underline;
+  color: #0088ce;
+}
+
+.view-filters form #views-exposed-form-content-score-page-1 {
+  display: none !important;
+}
+
+div.view-content-score {
+  margin: 20px 0 0 0;
+}
+
+/*----------- Admin Content Score -----------*/
+.page-admin-reports-content-score .view-content-score .view-header a {
+  display: inline-block;
+  padding: 6px 12px;
+  margin-bottom: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.42857143;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  -ms-touch-action: manipulation;
+  touch-action: manipulation;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  background-image: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #fff;
+  background-color: #337ab7;
+  border-color: #2e6da4;
+}
+.page-admin-reports-content-score .view-content-score .view-header a:hover {
+  color: #fff;
+  background-color: #286090;
+  border-color: #204d74;
+}
+.page-admin-reports-content-score .view-content-score .view-header a.active {
+  color: #286090;
+  background-color: #fff;
+  border-color: #204d74;
+}
+
+/*----------- Content Score - Vertical tabs -----------*/
+#content-score-main {
+  padding-bottom: 70px;
+}
+ul.resp-tabs-list {
+  float: left;
+}
+.resp-tab-item label {
+  cursor: pointer;
+}
+.resp-vtabs {
+  overflow: hidden;
+}
+.resp-tab-content {
+  border: 1px solid #5ab1d0;
+}
+.resp-tabs-container pre {
+  white-space: pre-wrap;
+  white-space: -moz-pre-wrap;
+  white-space: -pre-wrap;
+  white-space: -o-pre-wrap;
+}
+@media only screen and (min-width: 769px) {
+  .resp-vtabs ul.resp-tabs-list {
+    width: 20%;
+  }
+  .resp-vtabs .resp-tabs-container {
+    width: 80%;
+  }
+}
+.bad-score-red {
+  background: lightpink;
+  padding: 5px;
+}
+.score-green {
+  background: lightgreen;
+  padding: 5px;
+}
+.score-yellow {
+  background: yellow;
+  padding: 5px;
+}
+div #score_msg,
+div.view-header div {
+  font-weight: bold;
+  margin: 5px 0px;
+}

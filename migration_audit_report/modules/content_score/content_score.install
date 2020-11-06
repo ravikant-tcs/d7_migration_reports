@@ -1,0 +1,71 @@
+<?php
+
+/**
+ * @file
+ * Content score.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function content_score_schema() {
+  $schema = array();
+  $schema['content_score'] = array(
+    'description' => 'Stores entity of the content score module.',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'The primary identifier for a score.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'description' => 'Entity title/label.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'entity_id' => array(
+        'description' => 'The entity type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'entity_type' => array(
+        'description' => 'The entity type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'error_type' => array(
+        'description' => 'The score error type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'total_count' => array(
+        'description' => 'The total count of error type.',
+        'type' => 'int',
+        'default' => 0,
+      ),
+      'score' => array(
+        'description' => 'The human-readable error score of this type.',
+        'type' => 'int',
+        'default' => 0,
+      ),
+      'updated' => array(
+        'description' => 'The Unix timestamp when score was updated.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('cid'),
+  );
+
+  return $schema;
+}

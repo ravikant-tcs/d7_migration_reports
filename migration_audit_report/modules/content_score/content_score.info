@@ -1,0 +1,8 @@
+name = Content Score
+description = Content score
+core = 7.x
+version = 7.x-2.10.52
+
+dependencies[] = views
+
+files[] = views/handler/content_score_field_edit_link.inc
