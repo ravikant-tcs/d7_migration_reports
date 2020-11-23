@@ -10,7 +10,7 @@ function migration_audit_languages_data() {
   header('Content-Type: text/csv; charset=utf-8');
   header('Content-Disposition: attachment; filename=' . $filename);
   $csv_file = fopen("php://output", "w");
-  
+
   fputcsv($csv_file, $languages['header']);
 
   foreach($languages['data'] as $key => $data) {
@@ -69,3 +69,21 @@ function migration_get_languages() {
 
   return array('header' => $header, 'data' => $result);
 }
+
+function export_languages_entity() {
+  $content_type = migration_get_languages();
+  $count = count($content_type['header']);
+  $content_data = array(
+    array_values($content_type['header']),
+    array_values($content_type['header'])
+  );
+  foreach ($content_type['data'] as $data_obj) {
+    if (is_object($data_obj)) {
+      $data_obj = (array)$data_obj;
+    }
+    array_push($content_data, array_values($data_obj));
+  }
+
+  return array($content_data, $count);
+}
+

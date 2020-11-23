@@ -57,3 +57,20 @@ function migration_get_user_permissions() {
 
   return array('header' => $header, 'data' => $result);
 }
+
+function export_permissions_entity() {
+  $content_type = migration_get_user_permissions();
+  $count = count($content_type['header']);
+  $content_data = array(
+    array_values($content_type['header']),
+    array_values($content_type['header'])
+  );
+  foreach ($content_type['data'] as $data_obj) {
+    if (is_object($data_obj)) {
+      $data_obj = (array)$data_obj;
+    }
+    array_push($content_data, array_values($data_obj));
+  }
+
+  return array($content_data, $count);
+}

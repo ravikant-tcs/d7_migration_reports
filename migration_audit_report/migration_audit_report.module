@@ -7,6 +7,7 @@
 define('REPORT_ENTITIES', [
   'export_all' => '-- Export All Entities --',
   'node' => 'Contents',
+  'node_type' => 'Content Types',
   'field' => 'Fields',
   'blocks' => 'Blocks',
   'menus' => 'Menus',
@@ -17,7 +18,8 @@ define('REPORT_ENTITIES', [
   'permissions' => 'Permissions Matrix',
   'languages' => 'Languages',
   'modules' => 'Custom Modules',
-  'file_data' => 'Files / Media',
+  'file_media' => 'Files / Media',
+  'paragraph' => 'Paragraphs',
 ]);
 
 function migration_audit_report_menu() {
@@ -66,6 +68,11 @@ function migration_audit_report_form_submit($form, &$form_state) {
       migration_audit_node_report_data();
       break;
 
+    case 'node_type':
+      module_load_include('inc', 'migration_audit_report', 'includes/node_type_data');
+      migration_audit_node_type_report_data();
+      break;
+
     case 'field':
       module_load_include('inc', 'migration_audit_report', 'includes/field_data');
       migration_audit_field_report_data();
@@ -109,14 +116,22 @@ function migration_audit_report_form_submit($form, &$form_state) {
     case 'languages':
       module_load_include('inc', 'migration_audit_report', 'includes/languages_data');
       migration_audit_languages_data();
+      break;
 
     case 'modules':
       module_load_include('inc', 'migration_audit_report', 'includes/modules_data');
       migration_audit_modules_data();
+      break;
 
-    case 'file_data':
+    case 'file_media':
       module_load_include('inc', 'migration_audit_report', 'includes/file_media_data');
       migration_audit_file_media_data();
+      break;
+
+    case 'paragraph':
+      module_load_include('inc', 'migration_audit_report', 'includes/paragraph_data');
+      migration_audit_file_paragraph_data();
+      break;
 
     default:
       module_load_include('inc', 'migration_audit_report', 'includes/export_all_data');

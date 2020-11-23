@@ -2,3 +2,5 @@ name = migration audit report
 description = Migration audit report.
 package = pfizer
 core = 7.x
+
+dependencies[] = phpexcel

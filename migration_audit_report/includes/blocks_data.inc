@@ -16,7 +16,7 @@ function migration_audit_block_report_data() {
     if (is_object($record)) {
       $data = (array)$record;
     }
-    
+
     if (!empty($data)) {
       fputcsv($csv_file, $data, ',', '"');
     }
@@ -100,4 +100,38 @@ function migration_get_block_custom_data() {
   ];
 
   return ['header' => $block_custom_header, 'data' => $result];
+}
+
+function export_blocks_entity() {
+  // Add block data.
+  $block_data = migration_get_block_data();
+  $count1 = count($block_data['header']);
+  $content_data = array(
+    array_values($block_data['header']),
+    array_values($block_data['header'])
+  );
+  foreach ($block_data['data'] as $data_obj) {
+    if (is_object($data_obj)) {
+      $data_obj = (array)$data_obj;
+    }
+    array_push($content_data, array_values($data_obj));
+  }
+
+  array_push($content_data, ['','','','','','','','',]);
+  array_push($content_data, ['','','','','','','','',]);
+  array_push($content_data, ['','','','Custom Block Data','','','','',]);
+  // Custom block data.
+  $custom_block = migration_get_block_custom_data();
+  $count2 = count($custom_block['header']);
+  array_push($content_data, array_values($custom_block['header']));
+
+  foreach ($custom_block['data'] as $data_obj) {
+    if (is_object($data_obj)) {
+      $data_obj = (array)$data_obj;
+    }
+    array_push($content_data, array_values($data_obj));
+  }
+
+  $count = ($count1 > $count2) ? $count1 : $count2;
+  return array($content_data, $count);
 }

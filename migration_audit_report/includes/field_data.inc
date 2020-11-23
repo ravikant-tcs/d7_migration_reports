@@ -17,7 +17,7 @@ function migration_audit_field_report_data() {
     if (is_object($record)) {
       $data = (array)$record;
     }
-    
+
     if (!empty($data)) {
       fputcsv($csv_file, $data, ',', '"');
     }
@@ -58,4 +58,21 @@ function migration_get_fields() {
   ];
 
   return ['header' => $header, 'data' => $result];
+}
+
+function export_field_entity() {
+  $content_type = migration_get_fields();
+  $count = count($content_type['header']);
+  $content_data = array(
+    array_values($content_type['header']),
+    array_values($content_type['header'])
+  );
+  foreach ($content_type['data'] as $data_obj) {
+    if (is_object($data_obj)) {
+      $data_obj = (array)$data_obj;
+    }
+    array_push($content_data, array_values($data_obj));
+  }
+
+  return array($content_data, $count);
 }

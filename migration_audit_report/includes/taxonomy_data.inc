@@ -17,11 +17,11 @@ function migration_audit_taxonomy_data() {
     if (is_object($record)) {
       $data = (array)$record;
     }
-    
+
     if (!empty($data)) {
       fputcsv($csv_file, $data, ',', '"');
     }
-  }  
+  }
 
   fputcsv($csv_file, ['','','','','','','','','','','','','','','','',]);
   fputcsv($csv_file, ['','','','','','','','','','','','','','','','',]);
@@ -36,7 +36,7 @@ function migration_audit_taxonomy_data() {
       if (is_object($record)) {
         $data = (array)$record;
       }
-    
+
       if (!empty($data)) {
         fputcsv($csv_file, $data, ',', '"');
       }
@@ -101,4 +101,41 @@ function migration_get_taxonomy_details($vocabulary_details) {
   }
 
   return array('header' => $header, 'data' => $taxonomy_terms);
+}
+
+function export_taxonomy_entity() {
+  // Vocabulary Data.
+  $voc = migration_get_taxonomy_voc_details();
+  $count1 = count($voc['header']);
+  $content_data = array(
+    array_values($voc['header']),
+    ['','','','Vocabulary data','','','','','','','','',],
+    array_values($voc['header'])
+  );
+  foreach ($voc['data'] as $data_obj) {
+    if (is_object($data_obj)) {
+      $data_obj = (array)$data_obj;
+    }
+    array_push($content_data, array_values($data_obj));
+  }
+
+  array_push($content_data, ['','','','','','','','','','','','','','','','',]);
+  array_push($content_data, ['','','','','','','','','','','','','','','','',]);
+  array_push($content_data, ['','','','Terms data','','','','','','','','',]);
+    // Terms Data.
+  $term = migration_get_taxonomy_details($voc);
+  $count2 = count($term['header']);
+  array_push($content_data, array_values($term['header']));
+
+  foreach ($term['data'] as $value) {
+    foreach ($value as $key => $data_obj) {
+      if (is_object($data_obj)) {
+        $data_obj = (array)$data_obj;
+      }
+      array_push($content_data, array_values($data_obj));
+    }
+  }
+
+  $count = ($count1 > $count2) ? $count1 : $count2;
+  return array($content_data, $count);
 }
